@@ -1,287 +1,230 @@
-import { useState } from "react";
-
-/**
- * UGCGenerator.jsx
- * Simple React component that implements the UI controls and calls /api/generate-ugc
- * - Accepts product & model images (converts to base64)
- * - All dropdowns included (gender, hair style, hair color, pose, etc)
- * - Sends JSON to backend
- */
-
-const defaultOptions = {
-  aspectRatio: "9:16",
-  imageCount: 2,
-  speechLanguage: "Indonesia",
-  modelGender: "Female",
-  hairStyle: "Long Straight",
-  hairColor: "Black",
-  ethnicity: "Indonesian",
-  poseStyle: "Eye Contact",
-  composition: "Vlog Style",
-  lighting: "Ring Light",
-  colorGrading: "Natural",
-  vibe: "Bedroom Morning"
-};
-
-function toBase64(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) return resolve(null);
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      resolve(reader.result.split(",")[1]); // return base64 w/o data: prefix
-    };
-    reader.onerror = (err) => reject(err);
-  });
-}
+import React, { useState } from "react";
 
 export default function UGCGenerator() {
+  const [productImage, setProductImage] = useState(null);
+  const [modelImage, setModelImage] = useState(null);
+
   const [includeModel, setIncludeModel] = useState(true);
-  const [options, setOptions] = useState(defaultOptions);
-  const [productFile, setProductFile] = useState(null);
-  const [modelFile, setModelFile] = useState(null);
+  const [aspectRatio, setAspectRatio] = useState("9:16");
+  const [imageCount, setImageCount] = useState(2);
+  const [speechLang, setSpeechLang] = useState("Indonesia");
+
+  const [modelGender, setModelGender] = useState("Female");
+  const [hairStyle, setHairStyle] = useState("Long Straight");
+  const [hairColor, setHairColor] = useState("Black");
+  const [ethnicity, setEthnicity] = useState("Indonesian");
+  const [poseStyle, setPoseStyle] = useState("Eye Contact");
+  const [composition, setComposition] = useState("Full Body");
+  const [lighting, setLighting] = useState("Soft Light");
+  const [colorGrading, setColorGrading] = useState("Natural");
+  const [vibe, setVibe] = useState("Bedroom Morning");
+
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
 
-  // lists (as specified)
-  const hairStyles = ["Long Straight","Long Wavy","Long Curly","Medium Bob","Short Bob","Pixie Cut","Ponytail","Bun","Braided"];
-  const hairColors = ["Black","Dark Brown","Light Brown","Blonde","Platinum","Red","Ginger","Ash Grey"];
-  const aspectRatios = ["16:9","9:16"];
-  const imageCounts = [1,2,3,4,5,6];
-  const speechLanguages = ["Indonesia","English","Malaysia"];
-  const genders = ["Female","Male","Androgynous","Unspecified"];
-  const ethnicities = ["Indonesian","Asian","Caucasian","African","Middle Eastern","Latin","Indian","Mixed"];
-  const poseStyles = ["Eye Contact","Natural Smile","Side Look","Walking","Sitting Casual","Standing Straight","Holding Product","Talking Style","Over-the-Shoulder","Leaning Pose","Looking Down","Action / Movement"];
-  const compositions = ["Vlog Style","Product Focus","Full Body","Half Body","Close Up","Lifestyle Shot","Fashion Editorial","POV Shot","Mirror Selfie Style","Minimalist Studio Shot"];
-  const lightings = ["Ring Light","Soft Light","Golden Hour","Natural Window Light","Studio Light","High Contrast","Low Light Mood","Neon Light","Outdoor Shade"];
-  const colorGradings = ["Natural","Warm","Cool","Cinematic","High Contrast","Soft Pastel","Moody","Vibrant"];
-  const vibes = ["Bedroom Morning","Cafe Aesthetic","Outdoor Street","Minimalist Studio","Luxury Living Room","Shopping Mall","Rooftop Sunset","Beach Daylight","Office Modern","Cozy Warm Room","Clean White Background","Fashion Runway Style"];
+  const handleProductUpload = (e) => setProductImage(e.target.files[0]);
+  const handleModelUpload = (e) => setModelImage(e.target.files[0]);
 
-  const handleFileChange = (e, setter) => {
-    const f = e.target.files[0] || null;
-    setter(f);
-  };
-
-  const handleGenerate = async () => {
-    if (!productFile) {
+  const generateUGC = async () => {
+    if (!productImage) {
       alert("Product image is required.");
       return;
     }
     setLoading(true);
-    setResults([]);
-    try {
-      const productBase64 = await toBase64(productFile);
-      const modelBase64 = modelFile ? await toBase64(modelFile) : null;
 
-      const payload = {
-        product_image: productBase64,
-        model_image: modelBase64,
-        include_model: includeModel,
-        aspect_ratio: options.aspectRatio,
-        image_count: options.imageCount,
-        speech_language: options.speechLanguage,
-        model_gender: options.modelGender,
-        hair_style: options.hairStyle,
-        hair_color: options.hairColor,
-        ethnicity: options.ethnicity,
-        pose_style: options.poseStyle,
-        composition: options.composition,
-        lighting: options.lighting,
-        color_grading: options.colorGrading,
-        vibe: options.vibe
-      };
+    const body = new FormData();
+    body.append("product_image", productImage);
+    if (modelImage) body.append("model_image", modelImage);
 
-      const resp = await fetch("/api/generate-ugc", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    body.append("include_model", includeModel);
+    body.append("aspect_ratio", aspectRatio);
+    body.append("image_count", imageCount);
+    body.append("speech_language", speechLang);
+    body.append("model_gender", modelGender);
+    body.append("hair_style", hairStyle);
+    body.append("hair_color", hairColor);
+    body.append("ethnicity", ethnicity);
+    body.append("pose_style", poseStyle);
+    body.append("composition", composition);
+    body.append("lighting", lighting);
+    body.append("color_grading", colorGrading);
+    body.append("vibe", vibe);
 
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(text || "Server error");
-      }
-      const data = await resp.json();
-      // Expect backend returns array of base64 images data: ["..."] or urls
-      if (data.images && Array.isArray(data.images)) {
-        setResults(data.images);
-      } else {
-        // fallback if backend returns object
-        setResults([JSON.stringify(data).slice(0,500)]);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error generating images: " + (err.message || err));
-    } finally {
-      setLoading(false);
-    }
+    const res = await fetch("/api/generate-ugc", { method: "POST", body });
+    const data = await res.json();
+
+    setResults(data.images || []);
+    setLoading(false);
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6" style={{ background: "#242424", borderRadius: 12 }}>
-      <h2 style={{ color: "#FFC400", fontSize: 20, marginBottom: 8 }}>UGC Outfit Generator</h2>
+    <div className="panel">
+      <h2 style={{ color: "#FFC400" }}>UGC Outfit Generator</h2>
 
-      {/* Include Model Toggle */}
-      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <input type="checkbox" checked={includeModel} onChange={e => setIncludeModel(e.target.checked)} />
-        <span>Include Model</span>
+      <label>
+        <input
+          type="checkbox"
+          checked={includeModel}
+          onChange={() => setIncludeModel(!includeModel)}
+        />
+        Include Model
       </label>
 
-      {/* Upload boxes */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <div style={{ padding: 12, border: "2px dashed #3a3a3a", borderRadius: 8 }}>
-          <label style={{ display: "block", marginBottom: 6 }}>Product Image (required)</label>
-          <input type="file" accept="image/*" onChange={(e)=>handleFileChange(e, setProductFile)} />
-          {productFile && <div style={{ marginTop: 8 }}>{productFile.name}</div>}
-        </div>
-
-        <div style={{ padding: 12, border: "2px dashed #3a3a3a", borderRadius: 8 }}>
-          <label style={{ display: "block", marginBottom: 6 }}>Model Image (optional)</label>
-          <input type="file" accept="image/*" onChange={(e)=>handleFileChange(e, setModelFile)} disabled={!includeModel} />
-          {modelFile && <div style={{ marginTop: 8 }}>{modelFile.name}</div>}
-        </div>
+      <div className="upload-box">
+        <p>Upload Product Image</p>
+        <input type="file" onChange={handleProductUpload} />
       </div>
 
-      {/* Controls: aspect ratio, count, speech */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={{ marginBottom: 6 }}>Aspect Ratio</div>
-          <select value={options.aspectRatio} onChange={e => setOptions(o=>({...o, aspectRatio: e.target.value}))}>
-            {aspectRatios.map(r=> <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <div style={{ marginBottom: 6 }}>Image Count</div>
-          <select value={options.imageCount} onChange={e => setOptions(o=>({...o, imageCount: Number(e.target.value)}))}>
-            {imageCounts.map(c=> <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <div style={{ marginBottom: 6 }}>Speech Language</div>
-          <select value={options.speechLanguage} onChange={e => setOptions(o=>({...o, speechLanguage: e.target.value}))}>
-            {speechLanguages.map(l=> <option key={l} value={l}>{l}</option>)}
-          </select>
-        </div>
+      <div className="upload-box">
+        <p>Upload Model Image (Optional)</p>
+        <input type="file" onChange={handleModelUpload} />
       </div>
 
-      {/* Model settings including hair */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={{ marginBottom: 6 }}>Model Gender</div>
-          <select value={options.modelGender} onChange={e => setOptions(o=>({...o, modelGender: e.target.value}))}>
-            {genders.map(g=> <option key={g} value={g}>{g}</option>)}
-          </select>
-        </div>
+      <h3>Aspect Ratio</h3>
+      <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
+        <option>16:9</option>
+        <option>9:16</option>
+      </select>
 
-        <div>
-          <div style={{ marginBottom: 6 }}>Ethnicity</div>
-          <select value={options.ethnicity} onChange={e => setOptions(o=>({...o, ethnicity: e.target.value}))}>
-            {ethnicities.map(e=> <option key={e} value={e}>{e}</option>)}
-          </select>
-        </div>
+      <h3>Image Count</h3>
+      <select value={imageCount} onChange={(e) => setImageCount(e.target.value)}>
+        {[1,2,3,4,5,6].map(n => <option key={n}>{n}</option>)}
+      </select>
 
-        <div>
-          <div style={{ marginBottom: 6 }}>Hair Style</div>
-          <select value={options.hairStyle} onChange={e => setOptions(o=>({...o, hairStyle: e.target.value}))}>
-            {hairStyles.map(h=> <option key={h} value={h}>{h}</option>)}
-          </select>
-        </div>
+      <h3>Speech Language</h3>
+      <select value={speechLang} onChange={(e) => setSpeechLang(e.target.value)}>
+        <option>Indonesia</option>
+        <option>English</option>
+        <option>Malaysia</option>
+      </select>
 
-        <div>
-          <div style={{ marginBottom: 6 }}>Hair Color</div>
-          <select value={options.hairColor} onChange={e => setOptions(o=>({...o, hairColor: e.target.value}))}>
-            {hairColors.map(h=> <option key={h} value={h}>{h}</option>)}
-          </select>
-        </div>
-      </div>
+      <h3>Model Gender</h3>
+      <select value={modelGender} onChange={(e) => setModelGender(e.target.value)}>
+        <option>Female</option>
+        <option>Male</option>
+        <option>Androgynous</option>
+        <option>Unspecified</option>
+      </select>
 
-      {/* Pose, composition, lighting, grading, vibe */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={{ marginBottom: 6 }}>Pose Style</div>
-          <select value={options.poseStyle} onChange={e => setOptions(o=>({...o, poseStyle: e.target.value}))}>
-            {poseStyles.map(p=> <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
+      <h3>Hair Style</h3>
+      <select value={hairStyle} onChange={(e) => setHairStyle(e.target.value)}>
+        <option>Long Straight</option>
+        <option>Long Wavy</option>
+        <option>Long Curly</option>
+        <option>Medium Bob</option>
+        <option>Short Bob</option>
+        <option>Pixie Cut</option>
+        <option>Ponytail</option>
+        <option>Bun</option>
+        <option>Braided</option>
+      </select>
 
-        <div>
-          <div style={{ marginBottom: 6 }}>Composition</div>
-          <select value={options.composition} onChange={e => setOptions(o=>({...o, composition: e.target.value}))}>
-            {compositions.map(c=> <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
+      <h3>Hair Color</h3>
+      <select value={hairColor} onChange={(e) => setHairColor(e.target.value)}>
+        <option>Black</option>
+        <option>Dark Brown</option>
+        <option>Light Brown</option>
+        <option>Blonde</option>
+        <option>Platinum</option>
+        <option>Red</option>
+        <option>Ginger</option>
+        <option>Ash Grey</option>
+      </select>
 
-        <div>
-          <div style={{ marginBottom: 6 }}>Lighting</div>
-          <select value={options.lighting} onChange={e => setOptions(o=>({...o, lighting: e.target.value}))}>
-            {lightings.map(l=> <option key={l} value={l}>{l}</option>)}
-          </select>
-        </div>
+      <h3>Ethnicity</h3>
+      <select value={ethnicity} onChange={(e) => setEthnicity(e.target.value)}>
+        <option>Indonesian</option>
+        <option>Asian</option>
+        <option>Caucasian</option>
+        <option>African</option>
+        <option>Middle Eastern</option>
+        <option>Latin</option>
+        <option>Indian</option>
+        <option>Mixed</option>
+      </select>
 
-        <div>
-          <div style={{ marginBottom: 6 }}>Color Grading</div>
-          <select value={options.colorGrading} onChange={e => setOptions(o=>({...o, colorGrading: e.target.value}))}>
-            {colorGradings.map(c=> <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      </div>
+      <h3>Pose Style</h3>
+      <select value={poseStyle} onChange={(e) => setPoseStyle(e.target.value)}>
+        <option>Eye Contact</option>
+        <option>Natural Smile</option>
+        <option>Side Look</option>
+        <option>Walking</option>
+        <option>Sitting Casual</option>
+        <option>Standing Straight</option>
+        <option>Holding Product</option>
+        <option>Talking Style</option>
+        <option>Over-the-Shoulder</option>
+        <option>Leaning Pose</option>
+        <option>Looking Down</option>
+        <option>Action / Movement</option>
+      </select>
 
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ marginBottom: 6 }}>Vibe / Background</div>
-        <select value={options.vibe} onChange={e => setOptions(o=>({...o, vibe: e.target.value}))}>
-          {vibes.map(v=> <option key={v} value={v}>{v}</option>)}
-        </select>
-      </div>
+      <h3>Composition</h3>
+      <select value={composition} onChange={(e) => setComposition(e.target.value)}>
+        <option>Vlog Style</option>
+        <option>Product Focus</option>
+        <option>Full Body</option>
+        <option>Half Body</option>
+        <option>Close Up</option>
+        <option>Lifestyle Shot</option>
+        <option>Fashion Editorial</option>
+        <option>POV Shot</option>
+        <option>Mirror Selfie Style</option>
+        <option>Minimalist Studio Shot</option>
+      </select>
 
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-        <button
-          onClick={handleGenerate}
-          disabled={loading}
-          style={{
-            background: "#FFC400",
-            border: "none",
-            padding: "10px 18px",
-            borderRadius: 8,
-            cursor: "pointer",
-            minWidth: 180,
-            fontWeight: "600"
-          }}
-        >
-          {loading ? "Generating..." : "Generate UGC"}
-        </button>
-      </div>
+      <h3>Lighting</h3>
+      <select value={lighting} onChange={(e) => setLighting(e.target.value)}>
+        <option>Ring Light</option>
+        <option>Soft Light</option>
+        <option>Golden Hour</option>
+        <option>Natural Window Light</option>
+        <option>Studio Light</option>
+        <option>High Contrast</option>
+        <option>Low Light Mood</option>
+        <option>Neon Light</option>
+        <option>Outdoor Shade</option>
+      </select>
 
-      <div>
-        <h3 style={{ color: "#fff", marginBottom: 8 }}>Results</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-          {results.length === 0 && <div style={{ color: "#bbbbbb" }}>No images yet.</div>}
-          {results.map((img, idx) => (
-            <div key={idx} style={{ background: "#1b1b1b", padding: 8, borderRadius: 8 }}>
-              {/* If string starts with data: treat as base64; otherwise show text */}
-              {typeof img === "string" && img.startsWith("data:image") ? (
-                <>
-                  <img src={img} alt={`result-${idx}`} style={{ width: "100%", borderRadius: 6 }} />
-                  <a download={`ugc-${idx}.png`} href={img} style={{ display: "inline-block", marginTop: 8 }}>
-                    <button style={{ background: "#FFC400", border: "none", padding: "6px 8px", borderRadius: 6 }}>Download</button>
-                  </a>
-                </>
-              ) : typeof img === "string" && img.startsWith("/") ? (
-                // image URL
-                <>
-                  <img src={img} alt={`result-${idx}`} style={{ width: "100%", borderRadius: 6 }} />
-                  <a download style={{ display: "inline-block", marginTop: 8 }} href={img}> 
-                    <button style={{ background: "#FFC400", border: "none", padding: "6px 8px", borderRadius: 6 }}>Download</button>
-                  </a>
-                </>
-              ) : (
-                <pre style={{ color: "#ddd", whiteSpace: "pre-wrap", fontSize: 12 }}>{String(img).slice(0,1000)}</pre>
-              )}
-            </div>
+      <h3>Color Grading</h3>
+      <select value={colorGrading} onChange={(e) => setColorGrading(e.target.value)}>
+        <option>Natural</option>
+        <option>Warm</option>
+        <option>Cool</option>
+        <option>Cinematic</option>
+        <option>High Contrast</option>
+        <option>Soft Pastel</option>
+        <option>Moody</option>
+        <option>Vibrant</option>
+      </select>
+
+      <h3>Vibe / Background</h3>
+      <select value={vibe} onChange={(e) => setVibe(e.target.value)}>
+        <option>Bedroom Morning</option>
+        <option>Cafe Aesthetic</option>
+        <option>Outdoor Street</option>
+        <option>Minimalist Studio</option>
+        <option>Luxury Living Room</option>
+        <option>Shopping Mall</option>
+        <option>Rooftop Sunset</option>
+        <option>Beach Daylight</option>
+        <option>Office Modern</option>
+        <option>Cozy Warm Room</option>
+        <option>Clean White Background</option>
+        <option>Fashion Runway Style</option>
+      </select>
+
+      <button className="button-primary" onClick={generateUGC} disabled={loading}>
+        {loading ? "Generating..." : "Generate UGC"}
+      </button>
+
+      {results.length > 0 && (
+        <div className="results-grid">
+          {results.map((img, i) => (
+            <img key={i} src={img} style={{ width: "100%", borderRadius: "10px" }} />
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
